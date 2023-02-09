@@ -1,0 +1,147 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.certibus</groupId>
+  <artifactId>randoop-maven-plugin</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>maven-plugin</packaging>
+
+  <name>Randoop Maven Plugin</name>
+  <url>https://github.com/hsanchez/randoop-maven-plugin</url>
+
+  <properties>
+    <!-- Put Randoop Version Here -->
+    <revision>4.3.2</revision>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <java.version>1.8</java.version>
+    <maven.compiler.source>${java.version}</maven.compiler.source>
+    <maven.compiler.target>${java.version}</maven.compiler.target>
+    <maven.version>3.5.2</maven.version>
+    <randoop-url>
+      https://github.com/randoop/randoop/releases/download/v${revision}/randoop-all-${revision}.jar
+    </randoop-url>
+  </properties>
+
+  <dependencies>
+    <!-- only needed to make IDE happy -->
+<!--    <dependency>-->
+<!--      <groupId>randoop</groupId>-->
+<!--      <artifactId>randoop-all</artifactId>-->
+<!--      <version>${revision}</version>-->
+<!--      <scope>provided</scope>-->
+<!--    </dependency>-->
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-plugin-api</artifactId>
+      <version>3.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-core</artifactId>
+      <version>${maven.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.plugin-tools</groupId>
+      <artifactId>maven-plugin-annotations</artifactId>
+      <version>3.5.2</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-utils</artifactId>
+      <version>3.0.16</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>31.1-jre</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!--Download and unpack latest Randoop=>-->
+      <plugin>
+        <groupId>com.googlecode.maven-download-plugin</groupId>
+        <artifactId>download-maven-plugin</artifactId>
+        <version>1.6.8</version>
+        <executions>
+          <execution>
+            <id>download-randoop-all</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>wget</goal>
+            </goals>
+            <configuration>
+              <url>${randoop-url}</url>
+              <unpack>false</unpack>
+              <outputDirectory>${project.build.directory}/randoop-lib</outputDirectory>
+            </configuration>
+          </execution>
+          <execution>
+            <id>unpack-randoop-all</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>wget</goal>
+            </goals>
+            <configuration>
+              <url>${randoop-url}</url>
+              <unpack>true</unpack>
+              <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!--=>Download and unpack latest Randoop-->
+      <!-- Install Randoop=> -->
+      <plugin>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.0.0-M1</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>install-file</goal>
+            </goals>
+            <phase>initialize</phase>
+            <configuration>
+              <artifactId>randoop-all</artifactId>
+              <groupId>randoop</groupId>
+              <version>${revision}</version>
+              <packaging>jar</packaging>
+              <generatePom>true</generatePom>
+              <file>
+                ${project.build.directory}/randoop-lib/randoop-all-${revision}.jar
+              </file>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- =>Install Randoop -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-plugin-plugin</artifactId>
+        <version>3.7.1</version>
+        <configuration>
+          <goalPrefix>randoop</goalPrefix>
+          <skipErrorNoDescriptorsFound>true</skipErrorNoDescriptorsFound>
+        </configuration>
+        <executions>
+          <execution>
+            <id>mojo-descriptor</id>
+            <goals>
+              <goal>descriptor</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
