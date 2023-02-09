@@ -182,11 +182,13 @@ public class RandoopMojo extends AbstractMojo {
     final URL pluginJar = getClass().getProtectionDomain().getCodeSource().getLocation();
     pluginJarUrls.add(pluginJar);
 
+    getLog().debug("Seed dir: " + Paths.get(pluginJar.getFile()).getParent());
 
-    getLog().info("Seed dir: " + Paths.get(pluginJar.getFile()).getParent());
     final Optional<String> optionalRandoopVersion = Optional.ofNullable(project.getProperties().getProperty("revision"));
     final String randoopVersion = optionalRandoopVersion.orElse("4.3.2");
-    getLog().info("Randoop version: " + randoopVersion);
+
+    getLog().debug("Current Randoop version: " + randoopVersion);
+
     final Optional<Path> randoopJar = Util.findRandoopJar(pluginJar.getFile(), randoopVersion);
     if (randoopJar.isPresent() && Files.exists(randoopJar.get())){
       try {
