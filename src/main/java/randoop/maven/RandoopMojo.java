@@ -41,18 +41,17 @@ import org.apache.maven.project.MavenProject;
 @Mojo(name = "gentests", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
 public class RandoopMojo extends AbstractMojo {
 
-  @Parameter(required = true)
-  private String packageName;
+  @Parameter(required = true) private String packageName;
   @Parameter(required = true, defaultValue = "${project.build.outputDirectory}")
   private String sourceDirectory;
 
   // ${project.basedir}/src/test/java
   @Parameter(required = true, defaultValue = "${project.build.directory}/generated-test-sources/java")
   private String targetDirectory;
-  @Parameter(required = true, defaultValue = "60")
-  private int timeoutInSeconds;
-  @Parameter(defaultValue = "false")
-  String permitNonZeroExitStatus;
+  @Parameter(required = true, defaultValue = "60") private int timeoutInSeconds;
+  @Parameter(defaultValue = "false") String permitNonZeroExitStatus;
+
+  @Parameter(defaultValue = "etb2") String rootJavaPackage;
 
   @Parameter( defaultValue = "${project}", readonly = true)
   private MavenProject project;
@@ -86,7 +85,7 @@ public class RandoopMojo extends AbstractMojo {
     // For some unknown reason, Randoop keeps creating these empty directories; starting with the
     // project name as the root.
     // Temporary fix: Delete infamous directories after executing Randoop.
-    Path pathToBeDeleted = project.getBasedir().toPath().resolve("evidentia");
+    Path pathToBeDeleted = project.getBasedir().toPath().resolve(rootJavaPackage);
     if (!Files.exists(pathToBeDeleted)) return;
     try (Stream<Path> walk = Files.walk(pathToBeDeleted)) {
       walk.sorted(Comparator.reverseOrder())
