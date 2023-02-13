@@ -82,6 +82,10 @@ public class RandoopMojo extends AbstractMojo {
 
     getLog().info((exitCode == 0 ? "Randoop finished." : "Randoop did not finish."));
 
+    // TODO(has) prevent Randoop from creating empty directories for packageName's directories;
+    // For some unknown reason, Randoop keeps creating these empty directories; starting with the
+    // project name as the root.
+    // Temporary fix: Delete infamous directories after executing Randoop.
     Path pathToBeDeleted = project.getBasedir().toPath().resolve("evidentia");
     if (!Files.exists(pathToBeDeleted)) return;
     try (Stream<Path> walk = Files.walk(pathToBeDeleted)) {
