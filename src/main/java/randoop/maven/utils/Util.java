@@ -156,7 +156,7 @@ public class Util {
     Optional<Path> parentDir = findParentDir(seedPath, "repository");
 
     Path repository;
-    if (!parentDir.isPresent()) {
+    if (parentDir.isEmpty()) {
       final Path orElse = Paths.get(
           System.getProperty("user.home"),
           ".m2",
