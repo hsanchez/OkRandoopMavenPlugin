@@ -30,9 +30,12 @@ import randoop.maven.utils.Util;
 @SuppressWarnings("unused")
 @Mojo(name = "test-soundness")
 public class Soundness extends AbstractMojo {
-  @Parameter(required = true) private String packageName;
+  @Parameter(required = true)
+  private String packageName;
   @Parameter(defaultValue = "${project.build.directory}/surefire-reports/")
   private String surefireReportsDir;
+  @Parameter(required = true, defaultValue = "true")
+  private boolean failOnDivergence;
 
   @Parameter( defaultValue = "${project}", readonly = true)
   private MavenProject project;
@@ -72,7 +75,7 @@ public class Soundness extends AbstractMojo {
       // Randoop's old and new tests should not change. If they do, then
       // the tested project contains a likely new bug
       final SoundnessChecker soundnessChecker = new SoundnessChecker(pairUp);
-      soundnessChecker.passOrThrow();
+      soundnessChecker.passOrThrow(failOnDivergence);
     }
   }
 
@@ -115,8 +118,8 @@ public class Soundness extends AbstractMojo {
           .collect(Collectors.toMap(entry -> entry[0], entry -> Integer.parseInt(entry[1])));
     }
 
-    void passOrThrow() throws SoundnessError {
-      if (outputList.size() != 2) return;
+    void passOrThrow(boolean failOnDivergence) throws SoundnessError {
+      if (outputList.size() != 2 || !failOnDivergence) return;
 
       if (!Maps.difference(outputList.get(0), outputList.get(1)).areEqual()){
         throw new SoundnessError("Your Randoop unit tests before and after have diverged");
