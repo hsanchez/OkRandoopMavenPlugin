@@ -92,7 +92,7 @@ public class RandoopMojo extends AbstractMojo {
 
     // TODO(has) Prevent Randoop from generating empty directories matching the packageName
     // Temp. fix: search for those empty directories and delete them if found
-    trashRandoopLeftovers();
+    removesRandoopLeftovers();
   }
 
   private List<URL> resolveRandoopDependencies() throws MojoExecutionException {
@@ -104,13 +104,12 @@ public class RandoopMojo extends AbstractMojo {
   }
 
   private void copySurefireReportsIfExist() throws MojoFailureException {
-    final Predicate<File> isRandoopSuite = f -> f.getName().equalsIgnoreCase(
-        packageName  + ".RegressionTest.txt")
-        || f.getName().equalsIgnoreCase(
-            packageName + ".ErrorTest.txt");
+    final Predicate<File> isRandoopSuite = Util.newRandoopSurefireReportPredicate(packageName);
 
+    // Check previous surefire report file at '${project.build.directory}/surefire-reports/'
     final Path surefirePath = Paths.get(surefireReportsDir);
     if (Files.exists(surefirePath)){
+      // '${project.build.directory}/surefire-reports/${packageName}.[Regression|Error]Test.txt'
       Set<Path> matchedFiles = Util.findFiles(surefirePath, Util.TEXT_MATCHER).stream()
           .map(Path::toFile)
           .filter(isRandoopSuite)
@@ -125,10 +124,10 @@ public class RandoopMojo extends AbstractMojo {
           throw new MojoFailureException("Unable to copy surefire reports!", e);
         }
       }
-    }
+    } // Otherwise, Run Randoop as usual
   }
 
-  private void trashRandoopLeftovers() {
+  private void removesRandoopLeftovers() {
     Path pathToBeDeleted = project.getBasedir().toPath().resolve(rootJavaPackage);
     if (!Files.exists(pathToBeDeleted))
       return;

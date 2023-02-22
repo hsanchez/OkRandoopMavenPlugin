@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -40,6 +41,13 @@ public class Util {
 
   private Util(){
     throw new Error("Cannot be instantiated!");
+  }
+
+  public static Predicate<File> newRandoopSurefireReportPredicate(String packageName){
+    return f -> f.getName().equalsIgnoreCase(
+        packageName  + ".RegressionTest.txt")
+        || f.getName().equalsIgnoreCase(
+        packageName + ".ErrorTest.txt");
   }
 
   public static Path copyFiles(Path src, Path tgt, Collection<Path> files) throws IOException {
