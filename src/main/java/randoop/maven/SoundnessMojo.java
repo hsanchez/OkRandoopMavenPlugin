@@ -25,12 +25,16 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import randoop.maven.utils.Util;
 
 @SuppressWarnings("unused")
-@Mojo(name = "test-soundness", defaultPhase = LifecyclePhase.POST_INTEGRATION_TEST)
-public class Soundness extends AbstractMojo {
+@Mojo(
+    name = "test-soundness",
+    requiresDependencyResolution = ResolutionScope.TEST,
+    defaultPhase = LifecyclePhase.TEST)
+public class SoundnessMojo extends AbstractMojo {
   @Parameter(required = true)
   private String packageName;
   @Parameter(defaultValue = "${project.build.directory}/surefire-reports/")
