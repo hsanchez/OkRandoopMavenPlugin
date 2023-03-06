@@ -62,10 +62,19 @@ public class RandoopMojo extends AbstractMojo {
   @Parameter(defaultValue = "${project.build.directory}/surefire-reports/")
   private String surefireReportsDir;
 
+  /** Skip checking licence compliance */
+  @Parameter(property = "randoop.skip", defaultValue = "false")
+  private boolean skipRandoop;
+
   @Parameter( defaultValue = "${project}", readonly = true)
   private MavenProject project;
 
   @Override public void execute() throws MojoExecutionException, MojoFailureException {
+    if(skipRandoop){
+      getLog().info("skipping Randoop execution");
+      return;
+    }
+
     // Check if surefire reports have been generated. If they have,
     // copy them to ${project.basedir}/.surefire.d
     copySurefireReportsIfExist();
