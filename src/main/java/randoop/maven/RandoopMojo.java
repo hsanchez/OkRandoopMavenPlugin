@@ -77,7 +77,7 @@ public class RandoopMojo extends AbstractMojo {
 
     // Check if surefire reports have been generated. If they have,
     // copy them to ${project.basedir}/.surefire.d
-    copySurefireReportsIfExist();
+    saveCopyOfSurefireReportsIfExist();
 
     // Resolve any dependencies to the Randoop tool
     final List<URL> urls = resolveRandoopDependencies();
@@ -112,12 +112,17 @@ public class RandoopMojo extends AbstractMojo {
     return urls;
   }
 
-  private void copySurefireReportsIfExist() throws MojoFailureException {
+  private void saveCopyOfSurefireReportsIfExist() throws MojoFailureException {
     final Predicate<File> isRandoopSuite = Util.newRandoopSurefireReportPredicate(packageName);
 
+    final Path baseDir = project.getBasedir().toPath();
+
+    // Cold start scenario:
     // Check previous surefire report file at '${project.build.directory}/surefire-reports/'
+    // and persists a copy of its Randoop unit test report ONLY if we have not done so.
     final Path surefirePath = Paths.get(surefireReportsDir);
-    if (Files.exists(surefirePath)){
+    final Path surefireCopyPath = baseDir.resolve(".surefire.d");
+    if (Files.exists(surefirePath) && !Files.exists(surefireCopyPath)){
       // '${project.build.directory}/surefire-reports/${packageName}.[Regression|Error]Test.txt'
       Set<Path> matchedFiles = Util.findFiles(surefirePath, Util.TEXT_MATCHER).stream()
           .map(Path::toFile)
@@ -125,10 +130,9 @@ public class RandoopMojo extends AbstractMojo {
           .map(File::toPath)
           .collect(ImmutableSet.toImmutableSet());
 
-      final Path baseDir = project.getBasedir().toPath();
       for (Path each : matchedFiles){
         try {
-          Util.copyFiles(baseDir, baseDir.resolve(".surefire.d"), matchedFiles);
+          Util.copyFiles(baseDir, surefireCopyPath, matchedFiles);
         } catch (IOException e) {
           throw new MojoFailureException("Unable to copy surefire reports!", e);
         }

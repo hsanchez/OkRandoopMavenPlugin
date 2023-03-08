@@ -63,7 +63,7 @@ public class Util {
     for (Path each : files) {
       try {
         Files.copy(
-            src,
+            each,
             tgt.resolve(each.getFileName()),
             StandardCopyOption.REPLACE_EXISTING);
       } catch (IOException e) {
