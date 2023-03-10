@@ -33,7 +33,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import randoop.maven.utils.Util;
+import randoop.maven.utils.Utils;
 
 /**
  * Entry point to the Randoop maven plugin; more specifically to
@@ -66,11 +66,14 @@ public class RandoopMojo extends AbstractMojo {
   @Parameter(property = "randoop.skip", defaultValue = "false")
   private boolean skipRandoop;
 
+  @Parameter(property = "randoop.skip", defaultValue = "false")
+  private boolean alwaysColdStart;
+
   @Parameter( defaultValue = "${project}", readonly = true)
   private MavenProject project;
 
   @Override public void execute() throws MojoExecutionException, MojoFailureException {
-    if(skipRandoop){
+    if (skipRandoop){
       getLog().info("skipping Randoop execution");
       return;
     }
@@ -113,7 +116,7 @@ public class RandoopMojo extends AbstractMojo {
   }
 
   private void saveCopyOfSurefireReportsIfExist() throws MojoFailureException {
-    final Predicate<File> isRandoopSuite = Util.newRandoopSurefireReportPredicate(packageName);
+    final Predicate<File> isRandoopSuite = Utils.newRandoopSurefireReportPredicate(packageName);
 
     final Path baseDir = project.getBasedir().toPath();
 
@@ -122,9 +125,13 @@ public class RandoopMojo extends AbstractMojo {
     // and persists a copy of its Randoop unit test report ONLY if we have not done so.
     final Path surefirePath = Paths.get(surefireReportsDir);
     final Path surefireCopyPath = baseDir.resolve(".surefire.d");
+    if (alwaysColdStart){
+      Utils.deleteDirQuietly(surefireCopyPath);
+    }
+
     if (Files.exists(surefirePath) && !Files.exists(surefireCopyPath)){
       // '${project.build.directory}/surefire-reports/${packageName}.[Regression|Error]Test.txt'
-      Set<Path> matchedFiles = Util.findFiles(surefirePath, Util.TEXT_MATCHER).stream()
+      Set<Path> matchedFiles = Utils.findFiles(surefirePath, Utils.TEXT_MATCHER).stream()
           .map(Path::toFile)
           .filter(isRandoopSuite)
           .map(File::toPath)
@@ -132,7 +139,7 @@ public class RandoopMojo extends AbstractMojo {
 
       for (Path each : matchedFiles){
         try {
-          Util.copyFiles(baseDir, surefireCopyPath, matchedFiles);
+          Utils.copyFiles(baseDir, surefireCopyPath, matchedFiles);
         } catch (IOException e) {
           throw new MojoFailureException("Unable to copy surefire reports!", e);
         }
@@ -146,7 +153,7 @@ public class RandoopMojo extends AbstractMojo {
       return;
     try (Stream<Path> walk = Files.walk(pathToBeDeleted)) {
       walk.sorted(Comparator.reverseOrder())
-          .forEach(Util::deleteDir);
+          .forEach(Utils::deleteDirQuietly);
     } catch (IOException e){
       getLog().warn("Could not delete " + pathToBeDeleted + " Error details: " + e.getMessage());
     }
@@ -173,8 +180,8 @@ public class RandoopMojo extends AbstractMojo {
     args.add("--junit-output-dir=" + targetDirectory);
 
     // Add project classes
-    try(URLClassLoader classLoader = new URLClassLoader(Util.toURLArray(urls))) {
-      final Set<Class<?>> inPackageClasses = Util.classesLookup(packageName, classLoader);
+    try(URLClassLoader classLoader = new URLClassLoader(Utils.toURLArray(urls))) {
+      final Set<Class<?>> inPackageClasses = Utils.classesLookup(packageName, classLoader);
       for (Class<?> eachClass : inPackageClasses){
         getLog().info("Add class " + eachClass.getName());
         args.add("--testclass=" + eachClass.getName());
@@ -225,10 +232,10 @@ public class RandoopMojo extends AbstractMojo {
 
     getLog().debug("Current Randoop version: " + randoopVersion);
 
-    final Optional<Path> randoopJar = Util.findRandoopJar(pluginJar.getFile(), randoopVersion);
+    final Optional<Path> randoopJar = Utils.findRandoopJar(pluginJar.getFile(), randoopVersion);
     if (randoopJar.isPresent() && Files.exists(randoopJar.get())){
       try {
-        pluginJarUrls.add(Util.newURL(randoopJar.get().toString()));
+        pluginJarUrls.add(Utils.newURL(randoopJar.get().toString()));
       } catch (MalformedURLException e) {
         getLog().warn("Unable to find Randoop Jar", e);
       }
@@ -258,7 +265,7 @@ public class RandoopMojo extends AbstractMojo {
   private List<URL> resolveProjectClasses() throws MojoExecutionException {
     final URL classesLocation;
     try {
-      classesLocation = Util.newURL(sourceDirectory);
+      classesLocation = Utils.newURL(sourceDirectory);
     } catch (MalformedURLException e){
       throw new MojoExecutionException("Could not create source path!", e);
     }

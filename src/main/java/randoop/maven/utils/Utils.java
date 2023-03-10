@@ -19,27 +19,21 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class Util {
+public class Utils {
 
-  public static final PathMatcher JAVA_MATCHER = FileSystems.getDefault().getPathMatcher("glob:*.java");
   public static final PathMatcher TEXT_MATCHER = FileSystems.getDefault().getPathMatcher("glob:*.txt");
 
-  // Regular expression which matches expected names of JUnit test classes.
-  // thx to https://github.com/sevntu-checkstyle/sevntu.checkstyle
-  public static final Pattern RANDOOP_TEST_NAME_REGEX = Pattern.compile(
-      "RegressionTest\\d*|RegressionTests\\d*|RegressionTest.+|RegressionTests.+|ErrorTest\\d*|ErrorTests\\d*|ErrorTest.+|ErrorTests.+");
 
-
-  private Util(){
+  private Utils(){
     throw new Error("Cannot be instantiated!");
   }
 
@@ -75,53 +69,6 @@ public class Util {
     return tgt;
   }
 
-  public static Path copyTree(Path src, Path tgt) throws IOException {
-    Preconditions.checkArgument(Files.exists(src));
-    Preconditions.checkNotNull(tgt);
-
-    if (!Files.exists(tgt)){
-      Files.createDirectory(tgt);
-    }
-
-    assert Files.exists(tgt);
-
-    try (Stream<Path> stream = Files.walk(src)) {
-      stream.forEach(f -> {
-        try {
-          Files.copy(src, tgt.resolve(f.getFileName()),
-              StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-          // failed to copy tree
-          throw new RuntimeException(e.getMessage(), e);
-        }
-      });
-    }
-
-    return tgt;
-  }
-
-  public static Optional<Path> createTempDir(String prefix) {
-    try {
-      prefix = Strings.isNullOrEmpty(prefix) ? "RandoopTempDir" : prefix;
-      return Optional.of(Files.createTempDirectory(prefix));
-    } catch (IOException ignored) {
-    }
-    return Optional.empty();
-  }
-
-  public static Set<Path> findRandoopTests(Path targetDir) {
-    final List<Path> testFiles = Util.findFiles(targetDir, JAVA_MATCHER);
-    if (testFiles.isEmpty()) {
-      return ImmutableSet.of();
-    }
-
-    return testFiles.stream()
-        .map(Path::toFile)
-        .filter(file -> RANDOOP_TEST_NAME_REGEX.asPredicate().test(file.getName()))
-        .map(File::toPath)
-        .collect(ImmutableSet.toImmutableSet());
-  }
-
   /**
    * List all Java files found in a directory. Skip those files matching the provided skip hints.
    *
@@ -144,7 +91,7 @@ public class Util {
       walk.filter(Files::isReadable)
           .filter(Files::isRegularFile)
           .filter(file -> pathMatcher.matches(file.getFileName()))
-          .filter(file -> !Util.anyMatches(file, skipUniverse))
+          .filter(file -> !Utils.anyMatches(file, skipUniverse))
           .forEach(results::add);
     } catch (IOException ignored) {
     }
@@ -214,12 +161,37 @@ public class Util {
         .collect(Collectors.toSet());
   }
 
+  public static boolean isDirEmpty(Path path) throws IOException {
+    if (Files.isDirectory(path)) {
+      try (Stream<Path> entries = Files.list(path)) {
+        return entries.findFirst().isEmpty();
+      }
+    }
 
-  public static void deleteDir(Path path) {
+    return false;
+  }
+
+
+  public static void deleteDirQuietly(Path path) {
+    if (!Files.exists(path)) return;
+
     try {
-      Files.delete(path);
+      if (isDirEmpty(path)){
+        Files.delete(path);
+      } else {
+        // Delete a non-empty directory recursively
+        try (Stream<Path> walk = Files.walk(path)) {
+          //noinspection ResultOfMethodCallIgnored
+          walk.sorted(Comparator.reverseOrder())
+              .map(Path::toFile)
+              .forEach(File::delete);
+        }
+      }
     } catch (IOException ignored) {
     }
+
+    assert !Files.exists(path);
+
   }
 
   static boolean anyMatches(Path file, Set<String> skipUniverse) {
