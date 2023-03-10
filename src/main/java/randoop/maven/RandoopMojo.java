@@ -66,7 +66,7 @@ public class RandoopMojo extends AbstractMojo {
   @Parameter(property = "randoop.skip", defaultValue = "false")
   private boolean skipRandoop;
 
-  @Parameter(property = "randoop.skip", defaultValue = "false")
+  @Parameter(defaultValue = "false")
   private boolean alwaysColdStart;
 
   @Parameter( defaultValue = "${project}", readonly = true)
