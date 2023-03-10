@@ -62,12 +62,11 @@ public class RandoopMojo extends AbstractMojo {
   @Parameter(defaultValue = "${project.build.directory}/surefire-reports/")
   private String surefireReportsDir;
 
+  @Parameter(defaultValue = "false") private boolean forceColdStart;
+
   /** Skip checking licence compliance */
   @Parameter(property = "randoop.skip", defaultValue = "false")
   private boolean skipRandoop;
-
-  @Parameter(defaultValue = "false")
-  private boolean alwaysColdStart;
 
   @Parameter( defaultValue = "${project}", readonly = true)
   private MavenProject project;
@@ -125,7 +124,7 @@ public class RandoopMojo extends AbstractMojo {
     // and persists a copy of its Randoop unit test report ONLY if we have not done so.
     final Path surefirePath = Paths.get(surefireReportsDir);
     final Path surefireCopyPath = baseDir.resolve(".surefire.d");
-    if (alwaysColdStart){
+    if (forceColdStart){
       Utils.deleteDirQuietly(surefireCopyPath);
     }
 

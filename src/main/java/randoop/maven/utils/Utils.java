@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.MoreFiles;
 import com.google.common.reflect.ClassPath;
 import com.google.common.reflect.ClassPath.ClassInfo;
 import java.io.File;
@@ -19,7 +20,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -180,12 +180,7 @@ public class Utils {
         Files.delete(path);
       } else {
         // Delete a non-empty directory recursively
-        try (Stream<Path> walk = Files.walk(path)) {
-          //noinspection ResultOfMethodCallIgnored
-          walk.sorted(Comparator.reverseOrder())
-              .map(Path::toFile)
-              .forEach(File::delete);
-        }
+        MoreFiles.deleteRecursively(path);
       }
     } catch (IOException ignored) {
     }
