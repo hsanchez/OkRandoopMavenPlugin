@@ -1,6 +1,7 @@
 package randoop.maven;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -82,8 +83,13 @@ public class RandoopMojo extends AbstractMojo {
     saveCopyOfSurefireReportsIfExist();
 
     // Resolve any dependencies to the Randoop tool
-    final List<URL> urls = resolveRandoopDependencies();
-    final List<String> args = buildArgs(urls);
+    final List<URL> dependencies = new LinkedList<>(resolveCommonPluginDependencies());
+    final List<URL> randoopUrls = resolveRandoopDependencies();
+    if (randoopUrls.isEmpty()){
+      getLog().warn("Randoop Jar not found!");
+    }
+    dependencies.addAll(randoopUrls);
+    final List<String> args = buildArgs(dependencies);
 
     // Build Randoop command line
     final String randoopCmdLine = String.join(" ", args);
@@ -106,12 +112,15 @@ public class RandoopMojo extends AbstractMojo {
     removesRandoopLeftovers();
   }
 
-  private List<URL> resolveRandoopDependencies() throws MojoExecutionException {
+  private List<URL> resolveCommonPluginDependencies() throws MojoExecutionException {
     final List<URL> urls = new LinkedList<>(resolveProjectClasses());
     urls.addAll(resolveProjectDependencies(project));
-    // Add randoop plugin Jar and randoop dependency here
-    urls.addAll(resolvePluginJarWithRandoop());
     return urls;
+  }
+
+  private List<URL> resolveRandoopDependencies() throws MojoExecutionException {
+    // Add randoop plugin Jar and randoop dependency here
+    return new LinkedList<>(resolvePluginJarWithRandoop());
   }
 
   private void saveCopyOfSurefireReportsIfExist() throws MojoFailureException {
@@ -219,16 +228,23 @@ public class RandoopMojo extends AbstractMojo {
   }
 
 
-  private Set<URL> resolvePluginJarWithRandoop(){
+  private Set<URL> resolvePluginJarWithRandoop() throws MojoExecutionException {
     final List<URL> pluginJarUrls = new ArrayList<>();
-    final URL pluginJar = getClass().getProtectionDomain().getCodeSource().getLocation();
-    pluginJarUrls.add(pluginJar);
+    final URL pluginJar = Optional.ofNullable(getClass()
+        .getProtectionDomain().getCodeSource()
+        .getLocation())
+        .orElseThrow(() -> new MojoExecutionException("The Plugin Jar URL or file does not exist."));
 
-    getLog().debug("Seed dir: " + Paths.get(pluginJar.getFile()).getParent());
+    if (Strings.isNullOrEmpty(pluginJar.getFile())){
+      throw new MojoExecutionException("The Plugin Jar URL or file does not exist.");
+    }
+
+    getLog().debug("Plugin Jar found at: " + pluginJar.getFile());
+    pluginJarUrls.add(pluginJar);
+    getLog().debug("Parent dir of Plugin Jar: " + Paths.get(pluginJar.getFile()).getParent());
 
     final Optional<String> optionalRandoopVersion = Optional.ofNullable(project.getProperties().getProperty("revision"));
     final String randoopVersion = optionalRandoopVersion.orElse("4.3.2");
-
     getLog().debug("Current Randoop version: " + randoopVersion);
 
     final Optional<Path> randoopJar = Utils.findRandoopJar(pluginJar.getFile(), randoopVersion);
