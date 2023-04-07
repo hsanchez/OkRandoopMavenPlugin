@@ -182,10 +182,11 @@ public class Utils {
         .collect(Collectors.toSet());
   }
 
-  public static boolean isDirEmpty(Path path) throws IOException {
+  public static boolean isDirEmpty(Path path) {
     if (Files.isDirectory(path)) {
       try (Stream<Path> entries = Files.list(path)) {
         return entries.findFirst().isEmpty();
+      } catch (IOException ignored) {
       }
     }
 
