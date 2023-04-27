@@ -25,12 +25,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Utils {
 
+  public static final PathMatcher JAVA_MATCHER = FileSystems.getDefault().getPathMatcher("glob:*.java");
   public static final PathMatcher TEXT_MATCHER = FileSystems.getDefault().getPathMatcher("glob:*.txt");
+
+  // Regular expression which matches expected names of JUnit test classes.
+  // thx to https://github.com/sevntu-checkstyle/sevntu.checkstyle
+  public static final Predicate<String> RANDOOP_TESTS_PRED = Pattern.compile(
+      "RegressionTest\\d*|RegressionTests\\d*|RegressionTest.+|RegressionTests.+|ErrorTest\\d*|ErrorTests\\d*|ErrorTest.+|ErrorTests.+").asPredicate();
+
 
 
   private Utils(){
@@ -44,7 +52,7 @@ public class Utils {
         packageName + ".ErrorTest.txt");
   }
 
-  public static Path copyFiles(Path src, Path tgt, Collection<Path> files) throws IOException {
+  public static void copyFiles(Path src, Path tgt, Collection<Path> files) throws IOException {
     Preconditions.checkArgument(Files.exists(src));
     Preconditions.checkNotNull(tgt);
 
@@ -65,8 +73,6 @@ public class Utils {
         throw new RuntimeException(e.getMessage(), e);
       }
     }
-
-    return tgt;
   }
 
   /**
@@ -98,6 +104,21 @@ public class Utils {
 
     return results;
   }
+
+  public static Set<Path> findRandoopTests(Path targetDir) {
+    final List<Path> testFiles = findFiles(targetDir, JAVA_MATCHER);
+    if (testFiles.isEmpty()) {
+      return ImmutableSet.of();
+    }
+
+    return testFiles.stream()
+        .map(Path::toFile)
+        .filter(File::isFile)
+        .filter(file -> RANDOOP_TESTS_PRED.test(file.getName()))
+        .map(File::toPath)
+        .collect(ImmutableSet.toImmutableSet());
+  }
+
 
   public static Optional<Path> findRandoopJar(String seedPath, String randoopVersion) {
     Optional<Path> parentDir = findParentDir(seedPath, "repository");
@@ -161,10 +182,11 @@ public class Utils {
         .collect(Collectors.toSet());
   }
 
-  public static boolean isDirEmpty(Path path) throws IOException {
+  public static boolean isDirEmpty(Path path) {
     if (Files.isDirectory(path)) {
       try (Stream<Path> entries = Files.list(path)) {
         return entries.findFirst().isEmpty();
+      } catch (IOException ignored) {
       }
     }
 
@@ -180,8 +202,22 @@ public class Utils {
         Files.delete(path);
       } else {
         // Delete a non-empty directory recursively
+        //noinspection UnstableApiUsage
         MoreFiles.deleteRecursively(path);
       }
+    } catch (IOException ignored) {
+    }
+
+    assert !Files.exists(path);
+
+  }
+
+
+  public static void deleteFileQuietly(Path path) {
+    if (!Files.exists(path)) return;
+
+    try {
+      Files.delete(path);
     } catch (IOException ignored) {
     }
 

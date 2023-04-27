@@ -37,51 +37,69 @@ import org.apache.maven.project.MavenProject;
 import randoop.maven.utils.Utils;
 
 /**
- * Entry point to the Randoop maven plugin; more specifically to
- * the 'gentests' goal.
- *
- * Before execution, the plugin checks if tests have been run and
- * there are any surefire reports. If there are any, the plugin
- * will persist them, re-run Randoop, and then let surefire run the
- * regenerated tests. The last step will re-generate a new surefire report,
- * which the Soundness test verifier will pick up and compare it against
- * the previously generated.
- *
+ * Randoop maven plugin. This plugin provides the 'gentests' goal.
+ * This goal is part of Maven's 'Process Sources' lifecycle and will
+ * be only executed if property {@code --Drun.randoop=true} is set. Otherwise,
+ * its execution will be skipped.
+ * <p>
+ * If this is a cold start, 'gentests' calls Randoop, which in turn generates
+ * a set of regression tests according to 'gentests' configuration. These
+ * regression tests, on a set of newly introduced changes, will warn you if
+ * your new changes have changed the behavior of your program.
+ * <p>
+ * Otherwise, it assumes that previously generated regression tests pass,
+ * and that there is a test results file with statistics (such as number
+ * of failures, errors,) explaining their prior execution.
  */
 @SuppressWarnings("unused")
 @Mojo(name = "gentests", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
 public class RandoopMojo extends AbstractMojo {
 
+  @Parameter(defaultValue = "true")
+  private boolean cleanBefore;
+  @Parameter(defaultValue = "false") private boolean forgetPriorExecutions;
   @Parameter(required = true) private String packageName;
+  @Parameter(defaultValue = "false") private boolean permitNonZeroExitStatus;
+  @Parameter(defaultValue = "etb2") private String rootJavaPackage;
   @Parameter(required = true, defaultValue = "${project.build.outputDirectory}")
   private String sourceDirectory;
+  @Parameter(defaultValue = "${project.build.directory}/surefire-reports/")
+  private String surefireReportsDir;
   @Parameter(required = true, defaultValue = "${project.build.directory}/generated-test-sources/java")
   private String targetDirectory;
   @Parameter(required = true, defaultValue = "60") private int timeoutInSeconds;
-  @Parameter(defaultValue = "false") private boolean permitNonZeroExitStatus;
-  @Parameter(defaultValue = "etb2") private String rootJavaPackage;
-  @Parameter(defaultValue = "${project.build.directory}/surefire-reports/")
-  private String surefireReportsDir;
 
-  @Parameter(defaultValue = "false") private boolean forceColdStart;
 
-  /** Skip checking licence compliance */
-  @Parameter(property = "randoop.skip", defaultValue = "false")
-  private boolean skipRandoop;
+  /** Run Randoop unit test generator */
+  @Parameter(property = "run.randoop", defaultValue = "false")
+  private boolean runRandoop;
 
   @Parameter( defaultValue = "${project}", readonly = true)
   private MavenProject project;
 
   @Override public void execute() throws MojoExecutionException, MojoFailureException {
-    if (skipRandoop){
+    // If requested, cleanup previously generated Randoop tests
+    cleanupStep();
+    // Default behavior: Randoop won't be called out of the box.
+    // The user would have to provide the property -Drun.randoop=true.
+    // Otherwise
+    if (!runRandoop){
       getLog().info("skipping Randoop execution");
       return;
     }
+    // Check if the test reports of a prior tests execution exist.
+    // If they do, persist them on ${project.basedir}/.surefire.d
+    checkpointingStep();
 
-    // Check if surefire reports have been generated. If they have,
-    // copy them to ${project.basedir}/.surefire.d
-    saveCopyOfSurefireReportsIfExist();
+    // Calls Randoop to generate JUnit Tests for the given 'package-name'
+    runRandoopTool();
 
+    // TODO(has) Prevent Randoop from generating empty directories matching the packageName
+    // Temp. fix: search for those empty directories and delete them if found
+    removesRandoopLeftovers();
+  }
+
+  private void runRandoopTool() throws MojoExecutionException, MojoFailureException {
     // Resolve any dependencies to the Randoop tool
     final List<URL> dependencies = new LinkedList<>(resolveCommonPluginDependencies());
     final List<URL> randoopUrls = resolveRandoopDependencies();
@@ -106,10 +124,6 @@ public class RandoopMojo extends AbstractMojo {
     }
 
     getLog().info("Randoop " + (exitCode == 0 ? "finished." : "did not finish."));
-
-    // TODO(has) Prevent Randoop from generating empty directories matching the packageName
-    // Temp. fix: search for those empty directories and delete them if found
-    removesRandoopLeftovers();
   }
 
   private List<URL> resolveCommonPluginDependencies() throws MojoExecutionException {
@@ -123,7 +137,41 @@ public class RandoopMojo extends AbstractMojo {
     return new LinkedList<>(resolvePluginJarWithRandoop());
   }
 
-  private void saveCopyOfSurefireReportsIfExist() throws MojoFailureException {
+  private void cleanupStep() throws MojoFailureException {
+    final Path baseDir = project.getBasedir().toPath();
+    final Path javaDir = baseDir.resolve("src/test/java");
+
+    if (Strings.isNullOrEmpty(packageName)){
+      throw new MojoFailureException("Unavailable JUnit package name.?");
+    }
+
+    final Path junitOutputDir = javaDir.resolve(String.join(
+        "/", packageName.split("\\.")));
+
+    if (cleanBefore && Files.exists(junitOutputDir)){
+      final Set<Path> generatedUnitTests = Utils.findRandoopTests(junitOutputDir);
+      if (generatedUnitTests.isEmpty()){
+        getLog().debug("Found no JUnit tests generated by Randoop");
+      }
+
+      generatedUnitTests.forEach(Utils::deleteFileQuietly);
+      getLog().debug("Deleted JUnit tests generated by Randoop");
+    }
+
+    // delete the JUnit output directory if empty
+    if (Utils.isDirEmpty(junitOutputDir)){
+      Utils.deleteDirQuietly(junitOutputDir);
+
+      getLog().debug(String.format("Deleted empty directory: %s", junitOutputDir));
+    }
+
+    final Path surefireCopyPath = baseDir.resolve(".surefire.d");
+    if (forgetPriorExecutions){
+      Utils.deleteDirQuietly(surefireCopyPath);
+    }
+  }
+
+  private void checkpointingStep() throws MojoFailureException {
     final Predicate<File> isRandoopSuite = Utils.newRandoopSurefireReportPredicate(packageName);
 
     final Path baseDir = project.getBasedir().toPath();
@@ -133,9 +181,6 @@ public class RandoopMojo extends AbstractMojo {
     // and persists a copy of its Randoop unit test report ONLY if we have not done so.
     final Path surefirePath = Paths.get(surefireReportsDir);
     final Path surefireCopyPath = baseDir.resolve(".surefire.d");
-    if (forceColdStart){
-      Utils.deleteDirQuietly(surefireCopyPath);
-    }
 
     if (Files.exists(surefirePath) && !Files.exists(surefireCopyPath)){
       // '${project.build.directory}/surefire-reports/${packageName}.[Regression|Error]Test.txt'
@@ -156,6 +201,9 @@ public class RandoopMojo extends AbstractMojo {
   }
 
   private void removesRandoopLeftovers() {
+    // Randoop generates an orphaned directory. This directory
+    // is the top level package name in the package-name, provided
+    // in the maven configuration of the Randoop plugin.
     Path pathToBeDeleted = project.getBasedir().toPath().resolve(rootJavaPackage);
     if (!Files.exists(pathToBeDeleted))
       return;
